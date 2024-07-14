@@ -14,13 +14,61 @@ migrate = Migrate(app, db)
 
 db.init_app(app)
 
-@app.route('/messages')
+@app.route('/messages', methods=['GET', 'POST'])
 def messages():
-    return ''
+    if request.method == 'GET':
+        messages = Message.query.order_by('created_at').all()
+        messages_dict = [message.to_dict() for message in messages]
 
-@app.route('/messages/<int:id>')
+        return make_response(messages_dict, 200)
+    
+    elif request.method == 'POST':
+        # new_message = Message(
+        #     body=request.form.get("body"),
+        #     username=request.form.get("username")
+        # )
+        # DOESN'T WORK. This is due to the lab wanting everything in raw json, rather than form data. 
+
+        raw_json = request.get_json()
+        new_message = Message(
+            body = raw_json["body"],
+            username = raw_json["username"]
+        )
+
+        db.session.add(new_message)
+        db.session.commit()
+
+        message_dict = new_message.to_dict()
+
+        return make_response(message_dict, 201)
+    
+
+@app.route('/messages/<int:id>', methods=['PATCH', 'DELETE'])
 def messages_by_id(id):
-    return ''
+    message = Message.query.filter(Message.id == id).first()
+
+    if request.method == 'PATCH':
+        raw_json = request.get_json()
+        for attr in raw_json:
+            setattr(message, attr, raw_json.get(attr))
+
+        db.session.add(message)
+        db.session.commit()
+
+        message_dict = message.to_dict()
+        
+        return make_response(message_dict, 200)
+    
+    elif request.method == 'DELETE':
+        db.session.delete(message)
+        db.session.commit()
+
+        response_body = {
+            "delete_successful": True,
+            "message": "Message deleted."
+        }
+
+        return make_response(response_body, 200) 
 
 if __name__ == '__main__':
     app.run(port=5555)
